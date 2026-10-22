@@ -206,20 +206,105 @@
           <div class="graph-stats">
             <span id="graph-nodes-count">0 nodes</span> &bull; <span id="graph-edges-count">0 links</span>
           </div>
-          <div class="graph-controls">
-            <label class="graph-toggle-label" title="Toggle shared tag edges">
-              <input type="checkbox" id="graph-show-tags-cb" checked>
-              <span>Shared Tags</span>
-            </label>
-            <label class="graph-toggle-label" title="Toggle category edges">
-              <input type="checkbox" id="graph-show-categories-cb" checked>
-              <span>Categories</span>
-            </label>
+          <div class="graph-quick-actions">
             <button id="graph-zoom-in-btn" class="graph-btn" title="Zoom In">+</button>
             <button id="graph-zoom-out-btn" class="graph-btn" title="Zoom Out">&minus;</button>
-            <button id="graph-reset-btn" class="graph-btn" title="Reset Simulation & View">Reset</button>
+            <button id="graph-reset-btn" class="graph-btn" title="Reset View">Reset</button>
+            <button id="graph-panel-toggle-btn" class="graph-btn graph-settings-trigger" title="Toggle Graph Controls">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Controls</span>
+            </button>
           </div>
         </div>
+
+        <!-- Obsidian-Style Floating Graph Control Menu Overlay -->
+        <div id="graph-settings-panel" class="graph-settings-panel">
+          <div class="graph-panel-header" id="graph-panel-header">
+            <div class="graph-panel-title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Graph Controls</span>
+            </div>
+            <button id="graph-panel-close-btn" class="graph-panel-close-btn" title="Close Panel">&times;</button>
+          </div>
+
+          <div class="graph-panel-body" id="graph-panel-body">
+            <!-- Section: Display -->
+            <div class="graph-panel-section">
+              <div class="graph-section-header">Display</div>
+              <div class="graph-panel-group">
+                <label class="graph-checkbox-row">
+                  <input type="checkbox" id="graph-show-labels-cb" checked>
+                  <span>Node Labels</span>
+                </label>
+                <label class="graph-checkbox-row">
+                  <input type="checkbox" id="graph-color-category-cb">
+                  <span>Color by Category</span>
+                </label>
+                <label class="graph-checkbox-row">
+                  <input type="checkbox" id="graph-show-categories-cb" checked>
+                  <span>Category Links</span>
+                </label>
+                <label class="graph-checkbox-row">
+                  <input type="checkbox" id="graph-show-tags-cb" checked>
+                  <span>Shared Tag Links</span>
+                </label>
+              </div>
+              <div class="graph-slider-row">
+                <div class="graph-slider-label">
+                  <span>Node Size</span>
+                  <span id="graph-node-size-val">5px</span>
+                </div>
+                <input type="range" id="graph-node-size-slider" min="3" max="10" step="0.5" value="5">
+              </div>
+            </div>
+
+            <!-- Section: Forces -->
+            <div class="graph-panel-section">
+              <div class="graph-section-header">Forces</div>
+              <div class="graph-slider-row">
+                <div class="graph-slider-label">
+                  <span>Repulsion (Charge)</span>
+                  <span id="graph-charge-val">-300</span>
+                </div>
+                <input type="range" id="graph-charge-slider" min="100" max="600" step="20" value="300">
+              </div>
+              <div class="graph-slider-row">
+                <div class="graph-slider-label">
+                  <span>Link Distance</span>
+                  <span id="graph-link-dist-val">100px</span>
+                </div>
+                <input type="range" id="graph-link-dist-slider" min="60" max="200" step="10" value="100">
+              </div>
+              <div class="graph-slider-row">
+                <div class="graph-slider-label">
+                  <span>Link Strength</span>
+                  <span id="graph-link-strength-val">0.3</span>
+                </div>
+                <input type="range" id="graph-link-strength-slider" min="0.1" max="0.8" step="0.05" value="0.3">
+              </div>
+              <div class="graph-slider-row">
+                <div class="graph-slider-label">
+                  <span>Center Gravity</span>
+                  <span id="graph-gravity-val">0.003</span>
+                </div>
+                <input type="range" id="graph-gravity-slider" min="0.001" max="0.015" step="0.001" value="0.003">
+              </div>
+            </div>
+
+            <!-- Panel Footer Actions -->
+            <div class="graph-panel-footer">
+              <button id="graph-reset-forces-btn" class="graph-btn btn-sm">Reset Forces</button>
+              <button id="graph-reheat-btn" class="graph-btn btn-sm">Reheat</button>
+            </div>
+          </div>
+        </div>
+
         <canvas id="graph-canvas"></canvas>
         <div id="graph-tooltip" class="graph-tooltip"></div>
       </div>

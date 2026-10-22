@@ -1971,13 +1971,13 @@ body.resizing-active .peek-resize-handle::after {
 }
 
 /* ==========================================================================
-   GRAPH VIEW STYLING (Force-Directed Graph Canvas)
+   GRAPH VIEW STYLING (Obsidian Aesthetic Force-Directed Graph)
    ========================================================================== */
 .graph-container {
   position: relative;
   width: 100%;
   height: 640px;
-  min-height: 500px;
+  min-height: 520px;
   margin: var(--spacing-md) 0 var(--spacing-lg);
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -1992,6 +1992,7 @@ body.resizing-active .peek-resize-handle::after {
   height: 100%;
   display: block;
   cursor: grab;
+  touch-action: none;
 }
 
 #graph-canvas:active {
@@ -2012,68 +2013,211 @@ body.resizing-active .peek-resize-handle::after {
 
 .graph-stats {
   pointer-events: auto;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--color-muted);
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  padding: 5px 12px;
+  padding: 4px 10px;
   border-radius: var(--rounded-full);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.graph-controls {
+.graph-quick-actions {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  padding: 4px 8px;
-  border-radius: var(--rounded-md);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.graph-toggle-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: var(--color-muted);
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: var(--rounded-sm);
-  user-select: none;
-}
-
-.graph-toggle-label:hover {
-  color: var(--color-on-surface);
-}
-
-.graph-toggle-label input[type="checkbox"] {
-  cursor: pointer;
-  accent-color: var(--color-primary);
+  gap: 6px;
 }
 
 .graph-btn {
-  background: var(--color-tertiary);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-on-surface);
   font-size: 11px;
-  font-weight: 600;
-  height: 24px;
-  min-width: 24px;
-  padding: 0 6px;
+  font-weight: 500;
+  height: 26px;
+  min-width: 26px;
+  padding: 0 8px;
   border-radius: var(--rounded-sm);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.15s ease;
 }
 
 .graph-btn:hover {
   background: var(--color-surface-hover);
   border-color: var(--color-border-hover);
+  color: var(--color-primary);
+}
+
+.graph-settings-trigger {
+  font-weight: 600;
+}
+
+/* Obsidian-Style Floating Graph Control Menu Overlay */
+.graph-settings-panel {
+  position: absolute;
+  top: 48px;
+  right: 14px;
+  width: 250px;
+  max-width: calc(100% - 28px);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--rounded-md);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.graph-settings-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.graph-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: var(--color-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.graph-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  letter-spacing: 0.02em;
+}
+
+.graph-panel-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--rounded-sm);
+  transition: color 0.15s ease;
+}
+
+.graph-panel-close-btn:hover {
+  color: var(--color-on-surface);
+}
+
+.graph-panel-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.graph-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.graph-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.graph-panel-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.graph-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-on-surface);
+  cursor: pointer;
+}
+
+.graph-checkbox-row input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  width: 13px;
+  height: 13px;
+  margin: 0;
+}
+
+.graph-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.graph-slider-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+.graph-slider-label span:last-child {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--color-on-surface);
+  font-weight: 600;
+}
+
+.graph-slider-row input[type="range"] {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: var(--color-border);
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.graph-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.graph-panel-footer .graph-btn {
+  flex: 1;
+  text-align: center;
 }
 
 /* Graph Tooltip Card */

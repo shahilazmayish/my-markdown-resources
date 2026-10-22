@@ -51,11 +51,31 @@
     graphTooltip: document.getElementById('graph-tooltip'),
     graphNodesCount: document.getElementById('graph-nodes-count'),
     graphEdgesCount: document.getElementById('graph-edges-count'),
-    graphShowTagsCb: document.getElementById('graph-show-tags-cb'),
-    graphShowCategoriesCb: document.getElementById('graph-show-categories-cb'),
     graphZoomInBtn: document.getElementById('graph-zoom-in-btn'),
     graphZoomOutBtn: document.getElementById('graph-zoom-out-btn'),
     graphResetBtn: document.getElementById('graph-reset-btn'),
+
+    // Obsidian Floating Graph Controls Elements
+    graphSettingsPanel: document.getElementById('graph-settings-panel'),
+    graphPanelHeader: document.getElementById('graph-panel-header'),
+    graphPanelToggleBtn: document.getElementById('graph-panel-toggle-btn'),
+    graphPanelCloseBtn: document.getElementById('graph-panel-close-btn'),
+    graphShowLabelsCb: document.getElementById('graph-show-labels-cb'),
+    graphColorCategoryCb: document.getElementById('graph-color-category-cb'),
+    graphShowCategoriesCb: document.getElementById('graph-show-categories-cb'),
+    graphShowTagsCb: document.getElementById('graph-show-tags-cb'),
+    graphNodeSizeSlider: document.getElementById('graph-node-size-slider'),
+    graphNodeSizeVal: document.getElementById('graph-node-size-val'),
+    graphChargeSlider: document.getElementById('graph-charge-slider'),
+    graphChargeVal: document.getElementById('graph-charge-val'),
+    graphLinkDistSlider: document.getElementById('graph-link-dist-slider'),
+    graphLinkDistVal: document.getElementById('graph-link-dist-val'),
+    graphLinkStrengthSlider: document.getElementById('graph-link-strength-slider'),
+    graphLinkStrengthVal: document.getElementById('graph-link-strength-val'),
+    graphGravitySlider: document.getElementById('graph-gravity-slider'),
+    graphGravityVal: document.getElementById('graph-gravity-val'),
+    graphResetForcesBtn: document.getElementById('graph-reset-forces-btn'),
+    graphReheatBtn: document.getElementById('graph-reheat-btn'),
 
     // Theme Switcher Elements
     themeDropdownContainer: document.getElementById('theme-dropdown-container'),
@@ -726,7 +746,7 @@
   };
 
   // ==========================================================================
-  // GRAPH VIEW: INTERACTIVE FORCE-DIRECTED GRAPH SIMULATION
+  // GRAPH VIEW: OBSIDIAN-AESTHETIC FORCE-DIRECTED GRAPH SIMULATION
   // ==========================================================================
   const graphState = {
     canvas: null,
@@ -746,7 +766,23 @@
     alpha: 1.0,
     animId: null,
     isInitialized: false,
-    dpr: window.devicePixelRatio || 1
+    dpr: window.devicePixelRatio || 1,
+
+    // Obsidian Physics & Force Tuning Parameters
+    chargeForce: 300,        // Repulsion (-200 to -400)
+    linkDistance: 100,       // Link distance (80px–120px)
+    linkStrength: 0.3,       // Link strength (0.2–0.4)
+    collisionPadding: 25,    // Collision force padding (+25px)
+    centerGravity: 0.003,    // Soft center pull
+    alphaDecay: 0.02,        // Simulation velocity decay ~0.02 (0.98 decay multiplier)
+    velocityDecay: 0.92,     // Fluid velocity damping
+
+    // Obsidian Visual & Display Settings
+    baseNodeRadius: 5.0,     // 5px base radius
+    showLabels: true,        // Clean direct canvas labels
+    colorByCategory: false,  // Default: subtle Obsidian grey (#888888 / #a3a3a3)
+    showCategories: true,
+    showTags: true
   };
 
   const CATEGORY_COLORS = {
@@ -777,8 +813,8 @@
     el.graphCanvas.style.width = `${rect.width}px`;
     el.graphCanvas.style.height = `${rect.height}px`;
 
-    // Wake simulation to re-adjust center
-    graphState.alpha = Math.max(graphState.alpha, 0.3);
+    // Wake simulation to re-adjust
+    graphState.alpha = Math.max(graphState.alpha, 0.35);
     startGraphLoop();
   }
 
@@ -791,6 +827,16 @@
     } catch (err) {
       console.error('Failed to fetch graph data:', err);
       return { nodes: [], edges: [] };
+    }
+  }
+
+  function recalculateNodeRadii() {
+    for (const node of graphState.nodes) {
+      // Base radius 5px, scaling slightly up to 7px–8px for heavily connected nodes
+      node.radius = Math.max(
+        graphState.baseNodeRadius,
+        Math.min(graphState.baseNodeRadius + 3.2, graphState.baseNodeRadius + Math.sqrt(node.degree) * 0.85)
+      );
     }
   }
 
@@ -812,8 +858,8 @@
     const cx = (rect.width || 800) / 2;
     const cy = (rect.height || 600) / 2;
 
-    const showTags = el.graphShowTagsCb ? el.graphShowTagsCb.checked : true;
-    const showCategories = el.graphShowCategoriesCb ? el.graphShowCategoriesCb.checked : true;
+    const showTags = el.graphShowTagsCb ? el.graphShowTagsCb.checked : graphState.showTags;
+    const showCategories = el.graphShowCategoriesCb ? el.graphShowCategoriesCb.checked : graphState.showCategories;
 
     const visibleNodes = raw.nodes
       .filter(n => visibleIds.has(n.id))
@@ -828,11 +874,11 @@
           fileName: n.fileName,
           readingTime: n.readingTime,
           date: n.date,
-          x: existing ? existing.x : cx + (Math.random() - 0.5) * 300,
-          y: existing ? existing.y : cy + (Math.random() - 0.5) * 260,
+          x: existing ? existing.x : cx + (Math.random() - 0.5) * 380,
+          y: existing ? existing.y : cy + (Math.random() - 0.5) * 320,
           vx: existing ? existing.vx * 0.5 : 0,
           vy: existing ? existing.vy * 0.5 : 0,
-          radius: 12,
+          radius: graphState.baseNodeRadius,
           degree: 0,
           color
         };
@@ -861,14 +907,11 @@
       }
     }
 
-    // Dynamic node radius based on connection degree
-    for (const node of visibleNodes) {
-      node.radius = Math.max(9, Math.min(26, 9 + Math.sqrt(node.degree) * 3.5));
-    }
-
     graphState.nodes = visibleNodes;
     graphState.edges = activeEdges;
     graphState.nodeMap = nodeMap;
+
+    recalculateNodeRadii();
 
     if (el.graphNodesCount) {
       el.graphNodesCount.textContent = `${visibleNodes.length} node${visibleNodes.length === 1 ? '' : 's'}`;
@@ -895,19 +938,240 @@
     window.addEventListener('mouseup', onGraphMouseUp);
     el.graphCanvas.addEventListener('wheel', onGraphWheel, { passive: false });
 
-    // Controls
-    if (el.graphShowTagsCb) el.graphShowTagsCb.onchange = () => updateGraphData();
-    if (el.graphShowCategoriesCb) el.graphShowCategoriesCb.onchange = () => updateGraphData();
+    // Touch & Pinch-to-zoom support
+    let touchStartDist = 0;
+    let touchStartZoom = 1;
+    let touchStartPan = { x: 0, y: 0 };
+    let touchStartCenter = { x: 0, y: 0 };
 
-    if (el.graphZoomInBtn) {
-      el.graphZoomInBtn.onclick = () => {
-        zoomGraph(1.25);
+    el.graphCanvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const node = getNodeAt(touch.clientX, touch.clientY);
+        graphState.dragStart = { x: touch.clientX, y: touch.clientY };
+        graphState.mouseMovedDist = 0;
+        if (node) {
+          graphState.draggedNode = node;
+          graphState.alpha = Math.max(graphState.alpha, 0.45);
+          startGraphLoop();
+        } else {
+          graphState.isPanning = true;
+        }
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        graphState.draggedNode = null;
+        graphState.isPanning = false;
+        touchStartDist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        touchStartZoom = graphState.zoom;
+        touchStartCenter = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+        };
+        touchStartPan = { ...graphState.pan };
+      }
+    }, { passive: false });
+
+    el.graphCanvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const dx = touch.clientX - graphState.dragStart.x;
+        const dy = touch.clientY - graphState.dragStart.y;
+        graphState.mouseMovedDist += Math.hypot(dx, dy);
+
+        if (graphState.draggedNode) {
+          e.preventDefault();
+          const world = screenToWorld(touch.clientX, touch.clientY);
+          graphState.draggedNode.x = world.x;
+          graphState.draggedNode.y = world.y;
+          graphState.draggedNode.vx = 0;
+          graphState.draggedNode.vy = 0;
+          graphState.alpha = Math.max(graphState.alpha, 0.4);
+          startGraphLoop();
+          hideTooltip();
+        } else if (graphState.isPanning) {
+          e.preventDefault();
+          graphState.pan.x += dx;
+          graphState.pan.y += dy;
+          graphState.dragStart = { x: touch.clientX, y: touch.clientY };
+          renderGraph();
+          hideTooltip();
+        }
+      } else if (e.touches.length === 2) {
+        e.preventDefault();
+        const currentDist = Math.hypot(
+          e.touches[1].clientX - e.touches[0].clientX,
+          e.touches[1].clientY - e.touches[0].clientY
+        );
+        if (touchStartDist > 0) {
+          const factor = currentDist / touchStartDist;
+          const newZoom = Math.max(0.2, Math.min(3.5, touchStartZoom * factor));
+          const rect = el.graphContainer.getBoundingClientRect();
+          const cx = touchStartCenter.x - rect.left;
+          const cy = touchStartCenter.y - rect.top;
+          graphState.pan.x = cx - ((cx - touchStartPan.x) / touchStartZoom) * newZoom;
+          graphState.pan.y = cy - ((cy - touchStartPan.y) / touchStartZoom) * newZoom;
+          graphState.zoom = newZoom;
+          renderGraph();
+        }
+      }
+    }, { passive: false });
+
+    el.graphCanvas.addEventListener('touchend', (e) => {
+      if (graphState.draggedNode) {
+        if (graphState.mouseMovedDist < 8) {
+          openPeek(graphState.draggedNode.id);
+        }
+        graphState.draggedNode = null;
+      }
+      graphState.isPanning = false;
+      touchStartDist = 0;
+    });
+
+    // Obsidian Floating Settings Panel Controls
+    if (el.graphPanelToggleBtn && el.graphSettingsPanel) {
+      el.graphPanelToggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        el.graphSettingsPanel.classList.toggle('open');
       };
     }
-    if (el.graphZoomOutBtn) {
-      el.graphZoomOutBtn.onclick = () => {
-        zoomGraph(0.8);
+    if (el.graphPanelCloseBtn && el.graphSettingsPanel) {
+      el.graphPanelCloseBtn.onclick = () => {
+        el.graphSettingsPanel.classList.remove('open');
       };
+    }
+
+    // Display Toggles
+    if (el.graphShowLabelsCb) {
+      el.graphShowLabelsCb.checked = graphState.showLabels;
+      el.graphShowLabelsCb.onchange = () => {
+        graphState.showLabels = el.graphShowLabelsCb.checked;
+        renderGraph();
+      };
+    }
+
+    if (el.graphColorCategoryCb) {
+      el.graphColorCategoryCb.checked = graphState.colorByCategory;
+      el.graphColorCategoryCb.onchange = () => {
+        graphState.colorByCategory = el.graphColorCategoryCb.checked;
+        renderGraph();
+      };
+    }
+
+    if (el.graphShowCategoriesCb) {
+      el.graphShowCategoriesCb.checked = graphState.showCategories;
+      el.graphShowCategoriesCb.onchange = () => {
+        graphState.showCategories = el.graphShowCategoriesCb.checked;
+        updateGraphData();
+      };
+    }
+
+    if (el.graphShowTagsCb) {
+      el.graphShowTagsCb.checked = graphState.showTags;
+      el.graphShowTagsCb.onchange = () => {
+        graphState.showTags = el.graphShowTagsCb.checked;
+        updateGraphData();
+      };
+    }
+
+    // Node Size Slider
+    if (el.graphNodeSizeSlider) {
+      el.graphNodeSizeSlider.value = graphState.baseNodeRadius;
+      el.graphNodeSizeSlider.oninput = (e) => {
+        const val = Number(e.target.value);
+        graphState.baseNodeRadius = val;
+        if (el.graphNodeSizeVal) el.graphNodeSizeVal.textContent = `${val}px`;
+        recalculateNodeRadii();
+        renderGraph();
+      };
+    }
+
+    // Forces Sliders
+    if (el.graphChargeSlider) {
+      el.graphChargeSlider.value = graphState.chargeForce;
+      el.graphChargeSlider.oninput = (e) => {
+        const val = Number(e.target.value);
+        graphState.chargeForce = val;
+        if (el.graphChargeVal) el.graphChargeVal.textContent = `-${val}`;
+        graphState.alpha = Math.max(graphState.alpha, 0.45);
+        startGraphLoop();
+      };
+    }
+
+    if (el.graphLinkDistSlider) {
+      el.graphLinkDistSlider.value = graphState.linkDistance;
+      el.graphLinkDistSlider.oninput = (e) => {
+        const val = Number(e.target.value);
+        graphState.linkDistance = val;
+        if (el.graphLinkDistVal) el.graphLinkDistVal.textContent = `${val}px`;
+        graphState.alpha = Math.max(graphState.alpha, 0.45);
+        startGraphLoop();
+      };
+    }
+
+    if (el.graphLinkStrengthSlider) {
+      el.graphLinkStrengthSlider.value = graphState.linkStrength;
+      el.graphLinkStrengthSlider.oninput = (e) => {
+        const val = Number(e.target.value);
+        graphState.linkStrength = val;
+        if (el.graphLinkStrengthVal) el.graphLinkStrengthVal.textContent = `${val}`;
+        graphState.alpha = Math.max(graphState.alpha, 0.45);
+        startGraphLoop();
+      };
+    }
+
+    if (el.graphGravitySlider) {
+      el.graphGravitySlider.value = graphState.centerGravity;
+      el.graphGravitySlider.oninput = (e) => {
+        const val = Number(e.target.value);
+        graphState.centerGravity = val;
+        if (el.graphGravityVal) el.graphGravityVal.textContent = `${val}`;
+        graphState.alpha = Math.max(graphState.alpha, 0.45);
+        startGraphLoop();
+      };
+    }
+
+    if (el.graphResetForcesBtn) {
+      el.graphResetForcesBtn.onclick = () => {
+        graphState.chargeForce = 300;
+        graphState.linkDistance = 100;
+        graphState.linkStrength = 0.3;
+        graphState.centerGravity = 0.003;
+        graphState.baseNodeRadius = 5.0;
+
+        if (el.graphChargeSlider) el.graphChargeSlider.value = 300;
+        if (el.graphChargeVal) el.graphChargeVal.textContent = '-300';
+        if (el.graphLinkDistSlider) el.graphLinkDistSlider.value = 100;
+        if (el.graphLinkDistVal) el.graphLinkDistVal.textContent = '100px';
+        if (el.graphLinkStrengthSlider) el.graphLinkStrengthSlider.value = 0.3;
+        if (el.graphLinkStrengthVal) el.graphLinkStrengthVal.textContent = '0.3';
+        if (el.graphGravitySlider) el.graphGravitySlider.value = 0.003;
+        if (el.graphGravityVal) el.graphGravityVal.textContent = '0.003';
+        if (el.graphNodeSizeSlider) el.graphNodeSizeSlider.value = 5;
+        if (el.graphNodeSizeVal) el.graphNodeSizeVal.textContent = '5px';
+
+        recalculateNodeRadii();
+        graphState.alpha = 1.0;
+        startGraphLoop();
+        showToast('Physics forces reset to defaults');
+      };
+    }
+
+    if (el.graphReheatBtn) {
+      el.graphReheatBtn.onclick = () => {
+        graphState.alpha = 1.0;
+        startGraphLoop();
+      };
+    }
+
+    // Zoom Buttons
+    if (el.graphZoomInBtn) {
+      el.graphZoomInBtn.onclick = () => zoomGraph(1.25);
+    }
+    if (el.graphZoomOutBtn) {
+      el.graphZoomOutBtn.onclick = () => zoomGraph(0.8);
     }
     if (el.graphResetBtn) {
       el.graphResetBtn.onclick = () => {
@@ -936,7 +1200,6 @@
     const newZoom = Math.max(0.2, Math.min(3.5, oldZoom * factor));
     if (newZoom === oldZoom) return;
 
-    // Zoom towards center/mouse position
     graphState.pan.x = cx - ((cx - graphState.pan.x) / oldZoom) * newZoom;
     graphState.pan.y = cy - ((cy - graphState.pan.y) / oldZoom) * newZoom;
     graphState.zoom = newZoom;
@@ -944,7 +1207,6 @@
     renderGraph();
   }
 
-  // World coordinates converter
   function screenToWorld(sx, sy) {
     const rect = el.graphContainer.getBoundingClientRect();
     const x = sx - rect.left;
@@ -960,7 +1222,7 @@
     for (let i = graphState.nodes.length - 1; i >= 0; i--) {
       const n = graphState.nodes[i];
       const d = Math.hypot(n.x - world.x, n.y - world.y);
-      if (d <= n.radius + 5) {
+      if (d <= n.radius + 6) {
         return n;
       }
     }
@@ -975,7 +1237,7 @@
 
     if (node) {
       graphState.draggedNode = node;
-      graphState.alpha = Math.max(graphState.alpha, 0.5);
+      graphState.alpha = Math.max(graphState.alpha, 0.45);
       startGraphLoop();
     } else {
       graphState.isPanning = true;
@@ -1005,7 +1267,6 @@
       renderGraph();
       hideTooltip();
     } else {
-      // Hover detection
       const node = getNodeAt(e.clientX, e.clientY);
       if (node !== graphState.hoveredNode) {
         graphState.hoveredNode = node;
@@ -1024,7 +1285,6 @@
 
   function onGraphMouseUp(e) {
     if (graphState.draggedNode) {
-      // If minimal drag, treat as click to open peek!
       if (graphState.mouseMovedDist < 8) {
         openPeek(graphState.draggedNode.id);
       }
@@ -1047,7 +1307,6 @@
     let left = clientX - rect.left + 14;
     let top = clientY - rect.top + 14;
 
-    // Boundary check
     if (left + 260 > rect.width) left = left - 275;
     if (top + 130 > rect.height) top = top - 130;
 
@@ -1101,8 +1360,9 @@
     const rect = el.graphContainer.getBoundingClientRect();
     const cx = (rect.width || 800) / 2;
     const cy = (rect.height || 600) / 2;
+    const charge = graphState.chargeForce;
 
-    // 1. Repulsion between all nodes (Coulomb)
+    // 1. Repulsion between all nodes (Coulomb - charge repulsion -200 to -400)
     for (let i = 0; i < nodes.length; i++) {
       const n1 = nodes[i];
       for (let j = i + 1; j < nodes.length; j++) {
@@ -1111,8 +1371,9 @@
         const dy = n2.y - n1.y;
         const dSq = dx * dx + dy * dy + 100;
         const dist = Math.sqrt(dSq);
-        const force = (1600 / dSq) * alpha;
 
+        // Broad comfortable repulsion spread across the canvas
+        const force = Math.min(30, ((charge * 65) / Math.max(dSq, 200))) * alpha;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
 
@@ -1121,8 +1382,8 @@
         n2.vx += fx;
         n2.vy += fy;
 
-        // Collision radius resolution
-        const minDist = n1.radius + n2.radius + 8;
+        // Collision force: node size + 25px padding to prevent overlapping labels
+        const minDist = n1.radius + n2.radius + graphState.collisionPadding;
         if (dist < minDist) {
           const overlap = (minDist - dist) * 0.5 * alpha;
           const ox = (dx / dist) * overlap;
@@ -1135,7 +1396,7 @@
       }
     }
 
-    // 2. Spring Attraction along Edges (Hooke)
+    // 2. Spring Attraction along Edges (Hooke's Law - loose springy simulation)
     for (const e of edges) {
       const src = e.source;
       const tgt = e.target;
@@ -1143,17 +1404,18 @@
       const dy = tgt.y - src.y;
       const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
 
-      let restLength = 100;
-      let stiffness = 0.04;
+      let restLength = graphState.linkDistance;
+      let stiffness = graphState.linkStrength * 0.18;
+
       if (e.type === 'direct') {
-        restLength = 80;
-        stiffness = 0.08;
+        restLength = graphState.linkDistance * 0.9;
+        stiffness = graphState.linkStrength * 0.22;
       } else if (e.type === 'category') {
-        restLength = 130;
-        stiffness = 0.03;
+        restLength = graphState.linkDistance * 1.35;
+        stiffness = graphState.linkStrength * 0.14;
       } else if (e.type === 'tag') {
-        restLength = 160;
-        stiffness = 0.02;
+        restLength = graphState.linkDistance * 1.65;
+        stiffness = graphState.linkStrength * 0.09;
       }
 
       const diff = dist - restLength;
@@ -1171,22 +1433,22 @@
     for (const n of nodes) {
       if (n === graphState.draggedNode) continue;
 
-      // Gentle pull towards center
-      const gx = (cx - n.x) * 0.012 * alpha;
-      const gy = (cy - n.y) * 0.012 * alpha;
+      // Gentle center gravity
+      const gx = (cx - n.x) * graphState.centerGravity * alpha;
+      const gy = (cy - n.y) * graphState.centerGravity * alpha;
       n.vx += gx;
       n.vy += gy;
 
-      // Velocity damping
-      n.vx *= 0.88;
-      n.vy *= 0.88;
+      // Smooth velocity decay for weightless and fluid dragging
+      n.vx *= graphState.velocityDecay;
+      n.vy *= graphState.velocityDecay;
 
       n.x += n.vx;
       n.y += n.vy;
     }
 
-    // Cool down
-    graphState.alpha *= 0.992;
+    // Cool down with alpha decay ~0.02
+    graphState.alpha *= (1 - graphState.alphaDecay);
   }
 
   function renderGraph() {
@@ -1220,7 +1482,7 @@
     const isDark = state.currentTheme !== 'notion-light';
     const isPiszczek = state.currentTheme === 'piszczek';
 
-    // 1. Draw Edges
+    // 1. Draw Links (Obsidian Aesthetic: thin 1px lines with low opacity)
     for (const e of graphState.edges) {
       const isConnectedToHover = hovered && (e.source.id === hovered.id || e.target.id === hovered.id);
       const isDimmed = hovered && !isConnectedToHover;
@@ -1230,31 +1492,34 @@
       ctx.lineTo(e.target.x, e.target.y);
 
       if (isConnectedToHover) {
-        ctx.strokeStyle = isPiszczek ? '#00FF94' : '#0075de';
-        ctx.lineWidth = 2.2;
+        // Highlight in bright white / accent blue
+        ctx.strokeStyle = isPiszczek ? '#00FF94' : (isDark ? '#ffffff' : '#0075de');
+        ctx.lineWidth = 1.5;
         ctx.setLineDash([]);
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 0.95;
       } else if (isDimmed) {
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-        ctx.lineWidth = 1;
+        // Dim unrelated links
+        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+        ctx.lineWidth = 0.8;
         ctx.setLineDash([]);
-        ctx.globalAlpha = 0.2;
+        ctx.globalAlpha = 0.03;
       } else {
+        // Default thin 1px lines with low opacity (#ffffff1f or #444444)
         if (e.type === 'direct') {
-          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.5)' : (isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 117, 222, 0.4)');
-          ctx.lineWidth = 1.6;
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.35)' : (isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.14)');
+          ctx.lineWidth = 1.0;
           ctx.setLineDash([]);
         } else if (e.type === 'category') {
-          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.25)' : (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
-          ctx.lineWidth = 1.2;
-          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.2)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)');
+          ctx.lineWidth = 0.9;
+          ctx.setLineDash([3, 3]);
         } else {
-          // tag
-          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.15)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)');
-          ctx.lineWidth = 1;
-          ctx.setLineDash([2, 4]);
+          // Tag link
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.14)' : (isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)');
+          ctx.lineWidth = 0.8;
+          ctx.setLineDash([2, 3]);
         }
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 0.85;
       }
 
       ctx.stroke();
@@ -1263,53 +1528,71 @@
     ctx.setLineDash([]);
     ctx.globalAlpha = 1.0;
 
-    // 2. Draw Nodes
+    // 2. Draw Nodes (Obsidian Aesthetic: subtle grey dots 5px-8px, clean sans-serif text without boxes)
     for (const n of graphState.nodes) {
       const isHovered = n === hovered;
       const isConnected = !hovered || connectedNodeIds.has(n.id);
       const isActivePeek = n.id === activePeekId;
 
       ctx.save();
-      ctx.globalAlpha = isConnected ? 1.0 : 0.18;
+      ctx.globalAlpha = isConnected ? 1.0 : 0.15;
 
-      // Outer glow / active ring
+      // Hover / Active Glowing Halo
       if (isActivePeek || isHovered) {
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.radius + 5, 0, Math.PI * 2);
-        ctx.fillStyle = isPiszczek ? 'rgba(0, 255, 148, 0.25)' : 'rgba(0, 117, 222, 0.2)';
+        ctx.fillStyle = isPiszczek
+          ? 'rgba(0, 255, 148, 0.22)'
+          : (isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 117, 222, 0.18)');
         ctx.fill();
 
-        ctx.strokeStyle = isPiszczek ? '#00FF94' : '#0075de';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = isPiszczek ? '#00FF94' : (isDark ? '#ffffff' : '#0075de');
+        ctx.lineWidth = 1.5;
         ctx.stroke();
       }
 
-      // Base Node Circle
+      // Base Node Circle (subtle grey fills #888888 / #a3a3a3 or category color)
       ctx.beginPath();
-      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
-      ctx.fillStyle = n.color;
+      ctx.arc(n.x, n.y, isHovered ? n.radius + 1.2 : n.radius, 0, Math.PI * 2);
+
+      if (isHovered) {
+        ctx.fillStyle = isPiszczek ? '#00FF94' : (isDark ? '#ffffff' : '#0075de');
+      } else if (graphState.colorByCategory) {
+        ctx.fillStyle = n.color;
+      } else {
+        // Obsidian clean subtle grey
+        if (isDark) {
+          ctx.fillStyle = n.degree > 2 ? '#a3a3a3' : '#888888';
+        } else {
+          ctx.fillStyle = n.degree > 2 ? '#525252' : '#737373';
+        }
+      }
       ctx.fill();
 
-      ctx.strokeStyle = isDark ? '#191919' : '#ffffff';
-      ctx.lineWidth = 2;
+      // Delicate stroke
+      ctx.strokeStyle = isDark ? '#141414' : '#ffffff';
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
-      // Node Title Label
-      ctx.font = '500 11px NotionInter, -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
+      // Label Text: Rendered directly on the canvas without solid black boxes!
+      if (graphState.showLabels || isHovered) {
+        const labelY = n.y + n.radius + 6;
+        const text = n.title.length > 25 ? n.title.slice(0, 23) + '...' : n.title;
 
-      const labelY = n.y + n.radius + 5;
-      const text = n.title.length > 24 ? n.title.slice(0, 22) + '...' : n.title;
+        ctx.font = isHovered
+          ? '600 10.5px NotionInter, -apple-system, sans-serif'
+          : '400 10px NotionInter, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
 
-      if (isConnected) {
-        // Subtle text background pill
-        const textWidth = ctx.measureText(text).width;
-        ctx.fillStyle = isDark ? 'rgba(20, 20, 20, 0.85)' : 'rgba(255, 255, 255, 0.85)';
-        ctx.fillRect(n.x - textWidth / 2 - 4, labelY - 1, textWidth + 8, 15);
+        if (isHovered) {
+          ctx.fillStyle = isPiszczek ? '#00FF94' : (isDark ? '#ffffff' : '#0075de');
+        } else if (hovered && connectedNodeIds.has(n.id)) {
+          ctx.fillStyle = isDark ? '#e5e7eb' : '#1f2937';
+        } else {
+          ctx.fillStyle = isDark ? '#9ca3af' : '#4b5563';
+        }
 
-        ctx.fillStyle = isHovered ? (isPiszczek ? '#00FF94' : '#0075de') : (isDark ? '#f0f0f0' : '#111111');
-        if (isHovered) ctx.font = '700 11px NotionInter, -apple-system, sans-serif';
         ctx.fillText(text, n.x, labelY);
       }
 
