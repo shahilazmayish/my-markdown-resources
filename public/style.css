@@ -1725,6 +1725,193 @@ body.resizing-active .peek-resize-handle::after {
   }
 }
 
+/* ==========================================================================
+   GRAPH VIEW STYLING (Force-Directed Graph Canvas)
+   ========================================================================== */
+.graph-container {
+  position: relative;
+  width: 100%;
+  height: 640px;
+  min-height: 500px;
+  margin: var(--spacing-md) 0 var(--spacing-lg);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--rounded-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s ease, background-color 0.25s ease;
+}
+
+#graph-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+
+#graph-canvas:active {
+  cursor: grabbing;
+}
+
+.graph-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.graph-stats {
+  pointer-events: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-muted);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 5px 12px;
+  border-radius: var(--rounded-full);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.graph-controls {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  border-radius: var(--rounded-md);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.graph-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--rounded-sm);
+  user-select: none;
+}
+
+.graph-toggle-label:hover {
+  color: var(--color-on-surface);
+}
+
+.graph-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.graph-btn {
+  background: var(--color-tertiary);
+  border: 1px solid var(--color-border);
+  color: var(--color-on-surface);
+  font-size: 11px;
+  font-weight: 600;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 6px;
+  border-radius: var(--rounded-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.graph-btn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+}
+
+/* Graph Tooltip Card */
+.graph-tooltip {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--rounded-md);
+  padding: 10px 14px;
+  max-width: 260px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  font-size: 12px;
+}
+
+.graph-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.graph-tooltip-category {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.graph-tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-on-surface);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.graph-tooltip-meta {
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-bottom: 6px;
+}
+
+.graph-tooltip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.graph-tooltip-tag {
+  background-color: var(--color-tertiary);
+  color: var(--color-on-surface);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--rounded-full);
+}
+
+/* Wikilinks & Internal Links inside Markdown */
+.md-wikilink, .md-internal-link {
+  color: var(--color-primary) !important;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--color-primary);
+  padding-bottom: 1px;
+  transition: opacity 0.15s ease;
+}
+
+.md-wikilink:hover, .md-internal-link:hover {
+  opacity: 0.8;
+  border-bottom-style: solid;
+}
+
+.wikilink-bracket {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .hero-title {

@@ -34,6 +34,11 @@ This application is built for keeping all your knowledge, cheatsheets, documenta
    - Create new markdown files or edit existing ones directly in the browser.
    - All changes update the actual `.md` file on your disk!
 
+4. **Connected Knowledge Graph & Design System**
+   - See [[Notion Light Design System]] for typography and color tokens.
+   - Explore [[Modern Frontend Architecture]] for component design.
+   - Reference [Git Cheatsheet & Productivity Workflows](git-cheatsheet-and-workflows.md) and [RESTful API Best Practices](rest-api-best-practices.md).
+
 ---
 
 ## Formatting Cheatsheet

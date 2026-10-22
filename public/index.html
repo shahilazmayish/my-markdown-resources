@@ -172,6 +172,16 @@
                 <line x1="20" y1="3" x2="20" y2="21"></line>
               </svg>
             </button>
+            <button id="view-graph-btn" class="view-btn" title="Graph View">
+              <!-- Network / Nodes Lucide Icon -->
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -188,6 +198,30 @@
       <!-- Category Board View -->
       <div id="board-container" class="board-container" style="display: none;">
         <!-- Dynamically generated columns -->
+      </div>
+
+      <!-- Graph View (Interactive Force-Directed Graph Canvas) -->
+      <div id="graph-container" class="graph-container" style="display: none;">
+        <div class="graph-toolbar">
+          <div class="graph-stats">
+            <span id="graph-nodes-count">0 nodes</span> &bull; <span id="graph-edges-count">0 links</span>
+          </div>
+          <div class="graph-controls">
+            <label class="graph-toggle-label" title="Toggle shared tag edges">
+              <input type="checkbox" id="graph-show-tags-cb" checked>
+              <span>Shared Tags</span>
+            </label>
+            <label class="graph-toggle-label" title="Toggle category edges">
+              <input type="checkbox" id="graph-show-categories-cb" checked>
+              <span>Categories</span>
+            </label>
+            <button id="graph-zoom-in-btn" class="graph-btn" title="Zoom In">+</button>
+            <button id="graph-zoom-out-btn" class="graph-btn" title="Zoom Out">&minus;</button>
+            <button id="graph-reset-btn" class="graph-btn" title="Reset Simulation & View">Reset</button>
+          </div>
+        </div>
+        <canvas id="graph-canvas"></canvas>
+        <div id="graph-tooltip" class="graph-tooltip"></div>
       </div>
     </main>
 

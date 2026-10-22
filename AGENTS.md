@@ -6,11 +6,11 @@ Welcome to the **myResource** repository — an offline-first Notion & Terminal-
 
 ## 1. Project Overview & Architecture
 
-- **Backend (`server.js`)**: Native, zero-dependency Node.js HTTP server. Handles local directory scanning, YAML frontmatter parsing, automatic tag extraction, CRUD APIs, and static asset serving.
+- **Backend (`server.js`)**: Native, zero-dependency Node.js HTTP server. Handles local directory scanning, YAML frontmatter parsing, internal wikilink / markdown link extraction, automatic tag extraction, CRUD APIs (`/api/resources`, `/api/graph`, `/api/config`), and static asset serving.
 - **Frontend (`public/`)**: Pure offline vanilla JavaScript, HTML5, and CSS3 with CSS custom properties.
-  - `public/index.html`: Layout with top navigation, command bar, theme selector, and Notion peek drawer.
+  - `public/index.html`: Layout with top navigation, command bar, theme selector, 3 layout views (Grid, Category Board, Graph View), and Notion peek drawer.
   - `public/style.css`: Strict design system implementation supporting Notion Light, Notion Dark, Notion OLED, Charcoal Slate, Warm Espresso, and Piszczek Terminal Dark.
-  - `public/app.js`: State management, real-time search, tag/category filtering, resizable side peek drawer, and admin controls.
+  - `public/app.js`: State management, real-time search, tag/category filtering, interactive HTML5 Canvas force-directed graph simulation, resizable side peek drawer, and admin controls.
   - `public/vendor/marked.min.js`: Bundled offline Markdown parser.
 - **React Component (`components/NotionPeekGrid.jsx`)**: Standalone Tailwind CSS + Lucide React grid component with 3-mode peek drawer.
 - **Resource Directory (`localmd/`)**: Markdown `.md` files with YAML frontmatter (`title`, `category`, `tags`, `description`, `pinned`, `date`).

@@ -26,7 +26,12 @@ An offline-first personal resource hub crafted using the **Notion Light Design S
    - Discovers inline hashtags in document body text (e.g. `#architecture`, `#cheatsheet`).
    - Aggregates and displays tag chips with item counts for instant 1-click filtering.
 
-5. **Admin Access & Organization**:
+5. **3 Interactive Layout Views**:
+   - **Grid View**: Clean Notion cards with 'OPEN' hover badges and metadata.
+   - **Category Board View**: Kanban-style vertical columns organized by category.
+   - **Graph View**: Interactive HTML5 Canvas force-directed graph with physics, dynamic node sizing by degree, wikilink & category/tag edge mapping, zoom/pan controls, and hover tooltips.
+
+6. **Admin Access & Organization**:
    - **Toggle Admin Mode** (unlock with password, default: `admin`).
    - **Organize Categories**: Filter by category, view Category Board columns, and batch-rename categories across files.
    - **Edit Tags**: Add or remove tags per resource with interactive chips, or rename tags globally across all documents.

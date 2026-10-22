@@ -43,6 +43,19 @@
     changeDirBtn: document.getElementById('change-dir-btn'),
     viewGridBtn: document.getElementById('view-grid-btn'),
     viewBoardBtn: document.getElementById('view-board-btn'),
+    viewGraphBtn: document.getElementById('view-graph-btn'),
+
+    // Graph View Elements
+    graphContainer: document.getElementById('graph-container'),
+    graphCanvas: document.getElementById('graph-canvas'),
+    graphTooltip: document.getElementById('graph-tooltip'),
+    graphNodesCount: document.getElementById('graph-nodes-count'),
+    graphEdgesCount: document.getElementById('graph-edges-count'),
+    graphShowTagsCb: document.getElementById('graph-show-tags-cb'),
+    graphShowCategoriesCb: document.getElementById('graph-show-categories-cb'),
+    graphZoomInBtn: document.getElementById('graph-zoom-in-btn'),
+    graphZoomOutBtn: document.getElementById('graph-zoom-out-btn'),
+    graphResetBtn: document.getElementById('graph-reset-btn'),
 
     // Theme Switcher Elements
     themeDropdownContainer: document.getElementById('theme-dropdown-container'),
@@ -151,6 +164,14 @@
         btn.classList.remove('active');
       }
     });
+
+    // Update graph colors if initialized
+    if (typeof graphState !== 'undefined' && graphState.nodes && graphState.nodes.length > 0) {
+      for (const n of graphState.nodes) {
+        n.color = getCategoryColor(n.category);
+      }
+      renderGraph();
+    }
   }
 
   el.themeToggleBtn.onclick = (e) => {
@@ -248,11 +269,18 @@
     if (state.currentView === 'grid') {
       el.resourcesContainer.style.display = 'grid';
       el.boardContainer.style.display = 'none';
+      if (el.graphContainer) el.graphContainer.style.display = 'none';
       renderGrid();
-    } else {
+    } else if (state.currentView === 'board') {
       el.resourcesContainer.style.display = 'none';
       el.boardContainer.style.display = 'flex';
+      if (el.graphContainer) el.graphContainer.style.display = 'none';
       renderBoard();
+    } else if (state.currentView === 'graph') {
+      el.resourcesContainer.style.display = 'none';
+      el.boardContainer.style.display = 'none';
+      if (el.graphContainer) el.graphContainer.style.display = 'block';
+      updateGraphData();
     }
 
     // Update peek navigation counter if peek is open
@@ -434,6 +462,633 @@
   }
 
   // ==========================================================================
+  // INTERNAL WIKILINKS & MARKDOWN LINK HELPERS
+  // ==========================================================================
+  window.openResourceByTitle = function (title) {
+    if (!title) return;
+    const clean = title.trim().toLowerCase();
+    const match = state.resources.find(r => 
+      r.title.toLowerCase() === clean || 
+      r.title.toLowerCase().includes(clean) ||
+      r.fileName.toLowerCase().replace(/\.md$/i, '') === clean
+    );
+    if (match) {
+      openPeek(match.id);
+    } else {
+      showToast(`Resource "${title}" not found`);
+    }
+  };
+
+  window.openResourceByFilename = function (filename) {
+    if (!filename) return;
+    const clean = filename.split('#')[0].replace(/^(\.\/|\/)/, '').toLowerCase();
+    const base = clean.replace(/\.md$/i, '');
+    const match = state.resources.find(r => 
+      r.fileName.toLowerCase() === clean || 
+      r.fileName.toLowerCase().replace(/\.md$/i, '') === base
+    );
+    if (match) {
+      openPeek(match.id);
+    } else {
+      showToast(`File "${filename}" not found`);
+    }
+  };
+
+  // ==========================================================================
+  // GRAPH VIEW: INTERACTIVE FORCE-DIRECTED GRAPH SIMULATION
+  // ==========================================================================
+  const graphState = {
+    canvas: null,
+    ctx: null,
+    nodes: [],
+    edges: [],
+    nodeMap: new Map(),
+    rawGraphData: null,
+    pan: { x: 0, y: 0 },
+    zoom: 1.0,
+    hoveredNode: null,
+    draggedNode: null,
+    isPanning: false,
+    dragStart: { x: 0, y: 0 },
+    mouseScreen: { x: 0, y: 0 },
+    mouseMovedDist: 0,
+    alpha: 1.0,
+    animId: null,
+    isInitialized: false,
+    dpr: window.devicePixelRatio || 1
+  };
+
+  const CATEGORY_COLORS = {
+    'Getting Started': '#06b6d4',
+    'Design Systems': '#10b981',
+    'Engineering': '#0075de',
+    'DevTools': '#8b5cf6',
+    'Backend': '#f59e0b',
+    'DevOps': '#ec4899',
+    'General': '#64748b'
+  };
+
+  function getCategoryColor(cat) {
+    if (state.currentTheme === 'piszczek') {
+      return '#00FF94';
+    }
+    return CATEGORY_COLORS[cat] || '#0075de';
+  }
+
+  function resizeGraphCanvas() {
+    if (!el.graphCanvas || !el.graphContainer) return;
+    const rect = el.graphContainer.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    graphState.dpr = window.devicePixelRatio || 1;
+    el.graphCanvas.width = rect.width * graphState.dpr;
+    el.graphCanvas.height = rect.height * graphState.dpr;
+    el.graphCanvas.style.width = `${rect.width}px`;
+    el.graphCanvas.style.height = `${rect.height}px`;
+
+    // Wake simulation to re-adjust center
+    graphState.alpha = Math.max(graphState.alpha, 0.3);
+    startGraphLoop();
+  }
+
+  async function fetchGraphData() {
+    try {
+      const res = await fetch('/api/graph');
+      const data = await res.json();
+      graphState.rawGraphData = data;
+      return data;
+    } catch (err) {
+      console.error('Failed to fetch graph data:', err);
+      return { nodes: [], edges: [] };
+    }
+  }
+
+  async function updateGraphData() {
+    if (!graphState.isInitialized) {
+      initGraphView();
+    }
+
+    if (!graphState.rawGraphData) {
+      await fetchGraphData();
+    }
+
+    const raw = graphState.rawGraphData || { nodes: [], edges: [] };
+    const visibleIds = new Set(state.filteredResources.map(r => r.id));
+
+    // Filter nodes
+    const existingMap = new Map(graphState.nodes.map(n => [n.id, n]));
+    const rect = el.graphContainer.getBoundingClientRect();
+    const cx = (rect.width || 800) / 2;
+    const cy = (rect.height || 600) / 2;
+
+    const showTags = el.graphShowTagsCb ? el.graphShowTagsCb.checked : true;
+    const showCategories = el.graphShowCategoriesCb ? el.graphShowCategoriesCb.checked : true;
+
+    const visibleNodes = raw.nodes
+      .filter(n => visibleIds.has(n.id))
+      .map(n => {
+        const existing = existingMap.get(n.id);
+        const color = getCategoryColor(n.category);
+        return {
+          id: n.id,
+          title: n.title,
+          category: n.category,
+          tags: n.tags,
+          fileName: n.fileName,
+          readingTime: n.readingTime,
+          date: n.date,
+          x: existing ? existing.x : cx + (Math.random() - 0.5) * 300,
+          y: existing ? existing.y : cy + (Math.random() - 0.5) * 260,
+          vx: existing ? existing.vx * 0.5 : 0,
+          vy: existing ? existing.vy * 0.5 : 0,
+          radius: 12,
+          degree: 0,
+          color
+        };
+      });
+
+    const nodeMap = new Map(visibleNodes.map(n => [n.id, n]));
+
+    // Filter edges
+    const activeEdges = [];
+    for (const e of raw.edges) {
+      if (!visibleIds.has(e.source) || !visibleIds.has(e.target)) continue;
+      if (e.type === 'tag' && !showTags) continue;
+      if (e.type === 'category' && !showCategories) continue;
+
+      const src = nodeMap.get(e.source);
+      const tgt = nodeMap.get(e.target);
+      if (src && tgt) {
+        src.degree++;
+        tgt.degree++;
+        activeEdges.push({
+          source: src,
+          target: tgt,
+          type: e.type,
+          label: e.label
+        });
+      }
+    }
+
+    // Dynamic node radius based on connection degree
+    for (const node of visibleNodes) {
+      node.radius = Math.max(9, Math.min(26, 9 + Math.sqrt(node.degree) * 3.5));
+    }
+
+    graphState.nodes = visibleNodes;
+    graphState.edges = activeEdges;
+    graphState.nodeMap = nodeMap;
+
+    if (el.graphNodesCount) {
+      el.graphNodesCount.textContent = `${visibleNodes.length} node${visibleNodes.length === 1 ? '' : 's'}`;
+    }
+    if (el.graphEdgesCount) {
+      el.graphEdgesCount.textContent = `${activeEdges.length} link${activeEdges.length === 1 ? '' : 's'}`;
+    }
+
+    resizeGraphCanvas();
+    graphState.alpha = 1.0;
+    startGraphLoop();
+  }
+
+  function initGraphView() {
+    if (graphState.isInitialized) return;
+    graphState.isInitialized = true;
+
+    graphState.canvas = el.graphCanvas;
+    graphState.ctx = el.graphCanvas.getContext('2d');
+
+    // Canvas Mouse Listeners
+    el.graphCanvas.addEventListener('mousedown', onGraphMouseDown);
+    window.addEventListener('mousemove', onGraphMouseMove);
+    window.addEventListener('mouseup', onGraphMouseUp);
+    el.graphCanvas.addEventListener('wheel', onGraphWheel, { passive: false });
+
+    // Controls
+    if (el.graphShowTagsCb) el.graphShowTagsCb.onchange = () => updateGraphData();
+    if (el.graphShowCategoriesCb) el.graphShowCategoriesCb.onchange = () => updateGraphData();
+
+    if (el.graphZoomInBtn) {
+      el.graphZoomInBtn.onclick = () => {
+        zoomGraph(1.25);
+      };
+    }
+    if (el.graphZoomOutBtn) {
+      el.graphZoomOutBtn.onclick = () => {
+        zoomGraph(0.8);
+      };
+    }
+    if (el.graphResetBtn) {
+      el.graphResetBtn.onclick = () => {
+        graphState.pan = { x: 0, y: 0 };
+        graphState.zoom = 1.0;
+        graphState.alpha = 1.0;
+        startGraphLoop();
+        showToast('Graph view reset');
+      };
+    }
+
+    // Auto-resize on layout shift (e.g. side peek resize)
+    window.addEventListener('resize', resizeGraphCanvas);
+    if (window.ResizeObserver && el.graphContainer) {
+      const ro = new ResizeObserver(() => resizeGraphCanvas());
+      ro.observe(el.graphContainer);
+    }
+  }
+
+  function zoomGraph(factor, centerScreenX = null, centerScreenY = null) {
+    const rect = el.graphContainer.getBoundingClientRect();
+    const cx = centerScreenX !== null ? centerScreenX - rect.left : rect.width / 2;
+    const cy = centerScreenY !== null ? centerScreenY - rect.top : rect.height / 2;
+
+    const oldZoom = graphState.zoom;
+    const newZoom = Math.max(0.2, Math.min(3.5, oldZoom * factor));
+    if (newZoom === oldZoom) return;
+
+    // Zoom towards center/mouse position
+    graphState.pan.x = cx - ((cx - graphState.pan.x) / oldZoom) * newZoom;
+    graphState.pan.y = cy - ((cy - graphState.pan.y) / oldZoom) * newZoom;
+    graphState.zoom = newZoom;
+
+    renderGraph();
+  }
+
+  // World coordinates converter
+  function screenToWorld(sx, sy) {
+    const rect = el.graphContainer.getBoundingClientRect();
+    const x = sx - rect.left;
+    const y = sy - rect.top;
+    return {
+      x: (x - graphState.pan.x) / graphState.zoom,
+      y: (y - graphState.pan.y) / graphState.zoom
+    };
+  }
+
+  function getNodeAt(screenX, screenY) {
+    const world = screenToWorld(screenX, screenY);
+    for (let i = graphState.nodes.length - 1; i >= 0; i--) {
+      const n = graphState.nodes[i];
+      const d = Math.hypot(n.x - world.x, n.y - world.y);
+      if (d <= n.radius + 5) {
+        return n;
+      }
+    }
+    return null;
+  }
+
+  function onGraphMouseDown(e) {
+    if (e.button !== 0) return; // primary click only
+    const node = getNodeAt(e.clientX, e.clientY);
+    graphState.mouseMovedDist = 0;
+    graphState.dragStart = { x: e.clientX, y: e.clientY };
+
+    if (node) {
+      graphState.draggedNode = node;
+      graphState.alpha = Math.max(graphState.alpha, 0.5);
+      startGraphLoop();
+    } else {
+      graphState.isPanning = true;
+      el.graphCanvas.style.cursor = 'grabbing';
+    }
+  }
+
+  function onGraphMouseMove(e) {
+    graphState.mouseScreen = { x: e.clientX, y: e.clientY };
+    const dx = e.clientX - graphState.dragStart.x;
+    const dy = e.clientY - graphState.dragStart.y;
+    graphState.mouseMovedDist += Math.hypot(dx, dy);
+
+    if (graphState.draggedNode) {
+      const world = screenToWorld(e.clientX, e.clientY);
+      graphState.draggedNode.x = world.x;
+      graphState.draggedNode.y = world.y;
+      graphState.draggedNode.vx = 0;
+      graphState.draggedNode.vy = 0;
+      graphState.alpha = Math.max(graphState.alpha, 0.4);
+      startGraphLoop();
+      hideTooltip();
+    } else if (graphState.isPanning) {
+      graphState.pan.x += e.movementX;
+      graphState.pan.y += e.movementY;
+      graphState.dragStart = { x: e.clientX, y: e.clientY };
+      renderGraph();
+      hideTooltip();
+    } else {
+      // Hover detection
+      const node = getNodeAt(e.clientX, e.clientY);
+      if (node !== graphState.hoveredNode) {
+        graphState.hoveredNode = node;
+        renderGraph();
+      }
+
+      if (node) {
+        el.graphCanvas.style.cursor = 'pointer';
+        showTooltip(node, e.clientX, e.clientY);
+      } else {
+        el.graphCanvas.style.cursor = 'grab';
+        hideTooltip();
+      }
+    }
+  }
+
+  function onGraphMouseUp(e) {
+    if (graphState.draggedNode) {
+      // If minimal drag, treat as click to open peek!
+      if (graphState.mouseMovedDist < 8) {
+        openPeek(graphState.draggedNode.id);
+      }
+      graphState.draggedNode = null;
+    } else if (graphState.isPanning) {
+      graphState.isPanning = false;
+      el.graphCanvas.style.cursor = 'grab';
+    }
+  }
+
+  function onGraphWheel(e) {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.89;
+    zoomGraph(factor, e.clientX, e.clientY);
+  }
+
+  function showTooltip(node, clientX, clientY) {
+    if (!el.graphTooltip) return;
+    const rect = el.graphContainer.getBoundingClientRect();
+    let left = clientX - rect.left + 14;
+    let top = clientY - rect.top + 14;
+
+    // Boundary check
+    if (left + 260 > rect.width) left = left - 275;
+    if (top + 130 > rect.height) top = top - 130;
+
+    const tagsHtml = (node.tags || []).slice(0, 4)
+      .map(t => `<span class="graph-tooltip-tag">#${escapeHtml(t)}</span>`)
+      .join('');
+
+    el.graphTooltip.innerHTML = `
+      <div class="graph-tooltip-category">${escapeHtml(node.category)}</div>
+      <div class="graph-tooltip-title">${escapeHtml(node.title)}</div>
+      <div class="graph-tooltip-meta">${escapeHtml(node.fileName)} &bull; ${node.degree} links</div>
+      <div class="graph-tooltip-tags">${tagsHtml}</div>
+    `;
+
+    el.graphTooltip.style.left = `${left}px`;
+    el.graphTooltip.style.top = `${top}px`;
+    el.graphTooltip.classList.add('visible');
+  }
+
+  function hideTooltip() {
+    if (el.graphTooltip) {
+      el.graphTooltip.classList.remove('visible');
+    }
+  }
+
+  // --- FORCE SIMULATION LOOP ---
+  function startGraphLoop() {
+    if (graphState.animId) return;
+    function loop() {
+      if (state.currentView !== 'graph') {
+        graphState.animId = null;
+        return;
+      }
+
+      if (graphState.alpha > 0.003 || graphState.draggedNode) {
+        stepPhysics();
+        renderGraph();
+        graphState.animId = requestAnimationFrame(loop);
+      } else {
+        renderGraph();
+        graphState.animId = null;
+      }
+    }
+    graphState.animId = requestAnimationFrame(loop);
+  }
+
+  function stepPhysics() {
+    const nodes = graphState.nodes;
+    const edges = graphState.edges;
+    const alpha = graphState.alpha;
+    const rect = el.graphContainer.getBoundingClientRect();
+    const cx = (rect.width || 800) / 2;
+    const cy = (rect.height || 600) / 2;
+
+    // 1. Repulsion between all nodes (Coulomb)
+    for (let i = 0; i < nodes.length; i++) {
+      const n1 = nodes[i];
+      for (let j = i + 1; j < nodes.length; j++) {
+        const n2 = nodes[j];
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const dSq = dx * dx + dy * dy + 100;
+        const dist = Math.sqrt(dSq);
+        const force = (1600 / dSq) * alpha;
+
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+
+        n1.vx -= fx;
+        n1.vy -= fy;
+        n2.vx += fx;
+        n2.vy += fy;
+
+        // Collision radius resolution
+        const minDist = n1.radius + n2.radius + 8;
+        if (dist < minDist) {
+          const overlap = (minDist - dist) * 0.5 * alpha;
+          const ox = (dx / dist) * overlap;
+          const oy = (dy / dist) * overlap;
+          n1.vx -= ox;
+          n1.vy -= oy;
+          n2.vx += ox;
+          n2.vy += oy;
+        }
+      }
+    }
+
+    // 2. Spring Attraction along Edges (Hooke)
+    for (const e of edges) {
+      const src = e.source;
+      const tgt = e.target;
+      const dx = tgt.x - src.x;
+      const dy = tgt.y - src.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
+
+      let restLength = 100;
+      let stiffness = 0.04;
+      if (e.type === 'direct') {
+        restLength = 80;
+        stiffness = 0.08;
+      } else if (e.type === 'category') {
+        restLength = 130;
+        stiffness = 0.03;
+      } else if (e.type === 'tag') {
+        restLength = 160;
+        stiffness = 0.02;
+      }
+
+      const diff = dist - restLength;
+      const force = diff * stiffness * alpha;
+      const fx = (dx / dist) * force;
+      const fy = (dy / dist) * force;
+
+      src.vx += fx;
+      src.vy += fy;
+      tgt.vx -= fx;
+      tgt.vy -= fy;
+    }
+
+    // 3. Center Gravity & Position Integration
+    for (const n of nodes) {
+      if (n === graphState.draggedNode) continue;
+
+      // Gentle pull towards center
+      const gx = (cx - n.x) * 0.012 * alpha;
+      const gy = (cy - n.y) * 0.012 * alpha;
+      n.vx += gx;
+      n.vy += gy;
+
+      // Velocity damping
+      n.vx *= 0.88;
+      n.vy *= 0.88;
+
+      n.x += n.vx;
+      n.y += n.vy;
+    }
+
+    // Cool down
+    graphState.alpha *= 0.992;
+  }
+
+  function renderGraph() {
+    const ctx = graphState.ctx;
+    const canvas = graphState.canvas;
+    if (!ctx || !canvas) return;
+
+    const dpr = graphState.dpr;
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // High-DPI scaling & Zoom/Pan transform
+    ctx.scale(dpr, dpr);
+    ctx.translate(graphState.pan.x, graphState.pan.y);
+    ctx.scale(graphState.zoom, graphState.zoom);
+
+    const hovered = graphState.hoveredNode;
+    const activePeekId = state.peekActive ? state.peekResourceId : null;
+
+    // Set of connected neighbor IDs
+    const connectedNodeIds = new Set();
+    if (hovered) {
+      connectedNodeIds.add(hovered.id);
+      for (const e of graphState.edges) {
+        if (e.source.id === hovered.id) connectedNodeIds.add(e.target.id);
+        if (e.target.id === hovered.id) connectedNodeIds.add(e.source.id);
+      }
+    }
+
+    // Is dark theme?
+    const isDark = state.currentTheme !== 'notion-light';
+    const isPiszczek = state.currentTheme === 'piszczek';
+
+    // 1. Draw Edges
+    for (const e of graphState.edges) {
+      const isConnectedToHover = hovered && (e.source.id === hovered.id || e.target.id === hovered.id);
+      const isDimmed = hovered && !isConnectedToHover;
+
+      ctx.beginPath();
+      ctx.moveTo(e.source.x, e.source.y);
+      ctx.lineTo(e.target.x, e.target.y);
+
+      if (isConnectedToHover) {
+        ctx.strokeStyle = isPiszczek ? '#00FF94' : '#0075de';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.9;
+      } else if (isDimmed) {
+        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.2;
+      } else {
+        if (e.type === 'direct') {
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.5)' : (isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 117, 222, 0.4)');
+          ctx.lineWidth = 1.6;
+          ctx.setLineDash([]);
+        } else if (e.type === 'category') {
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.25)' : (isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([4, 4]);
+        } else {
+          // tag
+          ctx.strokeStyle = isPiszczek ? 'rgba(0, 255, 148, 0.15)' : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)');
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 4]);
+        }
+        ctx.globalAlpha = 0.7;
+      }
+
+      ctx.stroke();
+    }
+
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+
+    // 2. Draw Nodes
+    for (const n of graphState.nodes) {
+      const isHovered = n === hovered;
+      const isConnected = !hovered || connectedNodeIds.has(n.id);
+      const isActivePeek = n.id === activePeekId;
+
+      ctx.save();
+      ctx.globalAlpha = isConnected ? 1.0 : 0.18;
+
+      // Outer glow / active ring
+      if (isActivePeek || isHovered) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius + 5, 0, Math.PI * 2);
+        ctx.fillStyle = isPiszczek ? 'rgba(0, 255, 148, 0.25)' : 'rgba(0, 117, 222, 0.2)';
+        ctx.fill();
+
+        ctx.strokeStyle = isPiszczek ? '#00FF94' : '#0075de';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Base Node Circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+
+      ctx.strokeStyle = isDark ? '#191919' : '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Node Title Label
+      ctx.font = '500 11px NotionInter, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+
+      const labelY = n.y + n.radius + 5;
+      const text = n.title.length > 24 ? n.title.slice(0, 22) + '...' : n.title;
+
+      if (isConnected) {
+        // Subtle text background pill
+        const textWidth = ctx.measureText(text).width;
+        ctx.fillStyle = isDark ? 'rgba(20, 20, 20, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+        ctx.fillRect(n.x - textWidth / 2 - 4, labelY - 1, textWidth + 8, 15);
+
+        ctx.fillStyle = isHovered ? (isPiszczek ? '#00FF94' : '#0075de') : (isDark ? '#f0f0f0' : '#111111');
+        if (isHovered) ctx.font = '700 11px NotionInter, -apple-system, sans-serif';
+        ctx.fillText(text, n.x, labelY);
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // ==========================================================================
   // SPECS 2 & 3: NOTION RESIZABLE SIDE PEEK DRAWER & 3 MODES
   // ==========================================================================
 
@@ -453,6 +1108,10 @@
       document.documentElement.style.setProperty('--main-margin-right', `${clamped}px`);
     } else {
       document.documentElement.style.setProperty('--main-margin-right', '0px');
+    }
+
+    if (state.currentView === 'graph') {
+      resizeGraphCanvas();
     }
   }
 
@@ -524,6 +1183,11 @@
         c.classList.remove('active-peek');
       }
     });
+
+    if (state.currentView === 'graph') {
+      resizeGraphCanvas();
+      renderGraph();
+    }
   }
 
   window.openPeek = openPeek;
@@ -538,6 +1202,11 @@
     document.documentElement.style.setProperty('--main-margin-right', '0px');
 
     document.querySelectorAll('.active-peek').forEach(c => c.classList.remove('active-peek'));
+
+    if (state.currentView === 'graph') {
+      resizeGraphCanvas();
+      renderGraph();
+    }
   }
 
   window.closePeek = closePeek;
@@ -1108,6 +1777,7 @@
     state.currentView = 'grid';
     el.viewGridBtn.classList.add('active');
     el.viewBoardBtn.classList.remove('active');
+    if (el.viewGraphBtn) el.viewGraphBtn.classList.remove('active');
     applyFilters();
   };
 
@@ -1115,8 +1785,19 @@
     state.currentView = 'board';
     el.viewBoardBtn.classList.add('active');
     el.viewGridBtn.classList.remove('active');
+    if (el.viewGraphBtn) el.viewGraphBtn.classList.remove('active');
     applyFilters();
   };
+
+  if (el.viewGraphBtn) {
+    el.viewGraphBtn.onclick = () => {
+      state.currentView = 'graph';
+      el.viewGraphBtn.classList.add('active');
+      el.viewGridBtn.classList.remove('active');
+      el.viewBoardBtn.classList.remove('active');
+      applyFilters();
+    };
+  }
 
   // Buttons
   el.newResourceBtn.onclick = () => openEditor();

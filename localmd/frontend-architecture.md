@@ -45,4 +45,6 @@ Building reliable web applications requires separation of concerns, robust state
 +------------------------------------------------+
 ```
 
+See [[Notion Light Design System]] for styling conventions and [RESTful API Best Practices](rest-api-best-practices.md) for backend endpoints.
+
 #architecture #offline #clean-code

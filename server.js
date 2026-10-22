@@ -141,6 +141,41 @@ function extractHashtags(body) {
   return Array.from(tags);
 }
 
+// Helper: Extract internal links (wikilinks [[Note Title]] and markdown links [Label](note.md))
+function extractInternalLinks(body) {
+  const links = new Set();
+  const lines = body.split(/\r?\n/);
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    // 1. Wikilinks: [[Target Note]] or [[Target Note|Label]]
+    const wikiRegex = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+    let wMatch;
+    while ((wMatch = wikiRegex.exec(line)) !== null) {
+      const target = wMatch[1].trim();
+      if (target) links.add(target);
+    }
+
+    // 2. Markdown links: [Label](some-file.md)
+    const mdRegex = /\[([^\]]+)\]\(([^)]+\.md(?:#[^)]*)?)\)/g;
+    let mMatch;
+    while ((mMatch = mdRegex.exec(line)) !== null) {
+      let targetPath = mMatch[2].trim().split('#')[0];
+      targetPath = path.basename(targetPath);
+      if (targetPath) links.add(targetPath);
+    }
+  }
+
+  return Array.from(links);
+}
+
 // Helper: Build Frontmatter string
 function stringifyFrontmatter(data, body) {
   let fm = '---\n';
@@ -253,6 +288,9 @@ function loadResource(fileInfo) {
     const words = body.trim().split(/\s+/).filter(Boolean).length;
     const readingTime = Math.max(1, Math.ceil(words / 200));
 
+    // Internal links (wikilinks + md links)
+    const internalLinks = extractInternalLinks(body);
+
     // Stable ID: relative path encoded
     const id = Buffer.from(fileInfo.relativePath).toString('base64url');
 
@@ -263,6 +301,7 @@ function loadResource(fileInfo) {
       title,
       category,
       tags: combinedTags,
+      internalLinks,
       description: description || 'No summary available.',
       pinned: !!frontmatter.pinned,
       date: frontmatter.date || stats.birthtime.toISOString().split('T')[0],
@@ -420,8 +459,118 @@ const server = http.createServer(async (req, res) => {
   // GET /api/resources
   if (method === 'GET' && pathname === '/api/resources') {
     const resources = getAllResources();
-    // Return summaries (omit full body for lighter list if query param ?summary=1, else full)
     return sendJSON(res, 200, resources);
+  }
+
+  // GET /api/graph
+  if (method === 'GET' && pathname === '/api/graph') {
+    const resources = getAllResources();
+    const nodes = [];
+    const edges = [];
+    const edgeKeySet = new Set();
+
+    const byId = new Map();
+    const byFileName = new Map();
+    const byTitle = new Map();
+
+    for (const r of resources) {
+      byId.set(r.id, r);
+      byFileName.set(r.fileName.toLowerCase(), r);
+      byTitle.set(r.title.toLowerCase(), r);
+      const baseName = r.fileName.replace(/\.md$/i, '').toLowerCase();
+      byFileName.set(baseName, r);
+    }
+
+    // Nodes
+    for (const r of resources) {
+      nodes.push({
+        id: r.id,
+        title: r.title,
+        fileName: r.fileName,
+        category: r.category || 'General',
+        tags: r.tags || [],
+        description: r.description || '',
+        readingTime: r.readingTime,
+        pinned: r.pinned,
+        date: r.date,
+        updated: r.updated,
+        internalLinks: r.internalLinks || [],
+        inDegree: 0,
+        outDegree: 0,
+        degree: 0
+      });
+    }
+
+    function addEdge(sourceId, targetId, type, label) {
+      if (sourceId === targetId) return;
+      const key = sourceId < targetId ? `${sourceId}---${targetId}---${type}` : `${targetId}---${sourceId}---${type}`;
+      if (edgeKeySet.has(key)) return;
+      edgeKeySet.add(key);
+      edges.push({ source: sourceId, target: targetId, type, label: label || type });
+    }
+
+    // 1. Direct Links from body
+    for (const r of resources) {
+      for (const linkTarget of (r.internalLinks || [])) {
+        const clean = linkTarget.toLowerCase().replace(/\.md$/i, '').trim();
+        const matched = byTitle.get(clean) || byFileName.get(clean);
+        if (matched && matched.id !== r.id) {
+          addEdge(r.id, matched.id, 'direct', 'direct link');
+        }
+      }
+    }
+
+    // 2. Category Affinity Links
+    const catMap = {};
+    for (const r of resources) {
+      const c = (r.category || 'General').toLowerCase();
+      if (!catMap[c]) catMap[c] = [];
+      catMap[c].push(r.id);
+    }
+    for (const [c, ids] of Object.entries(catMap)) {
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          addEdge(ids[i], ids[j], 'category', c);
+        }
+      }
+    }
+
+    // 3. Shared Tag Links
+    const tagMap = {};
+    for (const r of resources) {
+      for (const t of r.tags) {
+        const tag = t.toLowerCase();
+        if (!tagMap[tag]) tagMap[tag] = [];
+        tagMap[tag].push(r.id);
+      }
+    }
+    for (const [tag, ids] of Object.entries(tagMap)) {
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          addEdge(ids[i], ids[j], 'tag', `#${tag}`);
+        }
+      }
+    }
+
+    // Compute degrees
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    for (const e of edges) {
+      const s = nodeMap.get(e.source);
+      const t = nodeMap.get(e.target);
+      if (s && t) {
+        s.outDegree++;
+        s.degree++;
+        t.inDegree++;
+        t.degree++;
+      }
+    }
+
+    return sendJSON(res, 200, {
+      nodes,
+      edges,
+      totalNodes: nodes.length,
+      totalEdges: edges.length
+    });
   }
 
   // GET /api/resources/:id
