@@ -1,9 +1,10 @@
 ---
 title: RESTful API Best Practices & Design
-category: Backend
+category: Design Systems
 tags: [backend, api, rest, http, architecture]
 description: Guidelines for designing clean, predictable, and robust REST APIs with pragmatic error handling.
 date: 2026-10-21
+updated: 2026-10-22
 ---
 
 # RESTful API Best Practices

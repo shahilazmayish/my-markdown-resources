@@ -1017,24 +1017,79 @@ body.resizing-active #app-layout-wrapper {
   display: flex;
 }
 
-/* Category Board View */
+/* Category Board View (Kanban) */
 .board-container {
   display: flex;
   gap: var(--spacing-sm);
   overflow-x: auto;
+  overflow-y: hidden;
   padding: var(--spacing-md) 0 var(--spacing-lg);
-  min-height: 500px;
+  min-height: 540px;
+  align-items: flex-start;
+  scroll-behavior: smooth;
+
+  /* Thin, dark scrollbars across modern browsers */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) rgba(0, 0, 0, 0.25);
+}
+
+/* Thin dark scrollbar styling for webkit (Chrome, Edge, Safari) */
+.board-container::-webkit-scrollbar {
+  height: 7px;
+  width: 7px;
+}
+
+.board-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 9999px;
+  margin: 0 4px;
+}
+
+.board-container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.board-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Light theme scrollbar overrides */
+[data-theme="notion-light"] .board-container {
+  scrollbar-color: rgba(0, 0, 0, 0.22) rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="notion-light"] .board-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="notion-light"] .board-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="notion-light"] .board-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.38);
 }
 
 .board-column {
   min-width: 320px;
   max-width: 340px;
+  width: 330px;
+  flex-shrink: 0;
   background-color: var(--color-tertiary);
   border: 1px solid var(--color-border);
   border-radius: var(--rounded-lg);
-  padding: var(--spacing-sm);
+  padding: 14px;
   display: flex;
   flex-direction: column;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.board-column.drag-over {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-60);
+  box-shadow: 0 0 0 2px var(--color-primary);
 }
 
 .board-col-header {
@@ -1043,14 +1098,138 @@ body.resizing-active #app-layout-wrapper {
   justify-content: space-between;
   font-size: var(--type-label-sm-size);
   font-weight: 600;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 12px;
+  user-select: none;
+  gap: 8px;
+}
+
+.board-col-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.board-col-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.board-col-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.board-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  height: 24px;
+  border-radius: var(--rounded-sm);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.board-add-btn:hover {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+
+.board-col-menu-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rounded-sm);
+  background: transparent;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.board-col-menu-btn:hover {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+/* Column Context Menu Dropdown */
+.board-col-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 150px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 50;
+  margin-top: 4px;
+}
+
+.board-col-actions.open .board-col-dropdown {
+  display: flex;
+  animation: fadeInDown 0.15s ease forwards;
+}
+
+.board-col-dropdown .dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--rounded-sm);
+  background: transparent;
+  border: none;
+  color: var(--color-on-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.board-col-dropdown .dropdown-item:hover {
+  background-color: var(--color-surface-hover);
 }
 
 .board-col-cards {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 10px;
+  min-height: 140px;
   flex: 1;
+}
+
+.board-empty-col {
+  color: var(--color-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 30px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--rounded-md);
+  margin-top: 4px;
+  line-height: 1.5;
+  user-select: none;
 }
 
 .board-card {
@@ -1060,17 +1239,83 @@ body.resizing-active #app-layout-wrapper {
   border-radius: var(--rounded-md);
   padding: 14px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.2s ease;
+  user-select: none;
 }
 
 .board-card:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-primary);
   background-color: var(--color-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.board-card.active-peek {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.board-card.dragging {
+  opacity: 0.45;
+  transform: scale(0.98);
+  border: 1px dashed var(--color-primary);
+  box-shadow: none;
 }
 
 .board-card:hover .card-open-badge {
   opacity: 1;
   transform: translateY(0);
+}
+
+.board-card-title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+  padding-right: 52px;
+  color: var(--color-on-surface);
+}
+
+.board-card-meta {
+  font-size: 12px;
+  color: var(--color-muted);
+  opacity: 0.82;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Tag chips wrap cleanly without horizontal overflow */
+.board-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px; /* gap-1.5: 6px */
+  align-items: center;
+}
+
+.board-card-tags.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.board-card-tags.gap-1\.5 {
+  gap: 6px;
+}
+
+.board-card-tags .chip {
+  font-size: 11px;
+  padding: 2px 7px;
+  margin: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
 
 /* ==========================================================================

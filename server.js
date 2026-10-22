@@ -719,6 +719,34 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /api/categories/delete (Batch reassign category to General or fallback)
+  if (method === 'POST' && pathname === '/api/categories/delete') {
+    try {
+      const { category, fallbackCategory = 'General' } = await readRequestBody(req);
+      if (!category) {
+        return sendJSON(res, 400, { error: 'Category name is required.' });
+      }
+
+      const files = scanDirectory(config.localmdDir);
+      let count = 0;
+
+      for (const f of files) {
+        const raw = fs.readFileSync(f.fullPath, 'utf-8');
+        const { frontmatter, body } = parseFrontmatter(raw);
+        if (frontmatter.category && frontmatter.category.trim().toLowerCase() === category.trim().toLowerCase()) {
+          frontmatter.category = fallbackCategory.trim();
+          frontmatter.updated = new Date().toISOString().split('T')[0];
+          fs.writeFileSync(f.fullPath, stringifyFrontmatter(frontmatter, body), 'utf-8');
+          count++;
+        }
+      }
+
+      return sendJSON(res, 200, { success: true, updatedCount: count, fallbackCategory });
+    } catch (err) {
+      return sendJSON(res, 500, { error: err.message });
+    }
+  }
+
   // POST /api/tags/rename (Batch rename a tag across all files)
   if (method === 'POST' && pathname === '/api/tags/rename') {
     try {

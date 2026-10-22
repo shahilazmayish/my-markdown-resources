@@ -410,24 +410,221 @@
     });
   }
 
+  // --- KANBAN BOARD DRAG & DROP AND COLUMN HELPERS ---
+  let isDraggingBoardCard = false;
+  window.__boardDraggedId = null;
+
+  window.handleBoardDragStart = function (e, id) {
+    isDraggingBoardCard = true;
+    window.__boardDraggedId = id;
+    if (e.dataTransfer) {
+      e.dataTransfer.setData('text/plain', id);
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    const card = e.currentTarget;
+    setTimeout(() => {
+      if (card) card.classList.add('dragging');
+    }, 0);
+  };
+
+  window.handleBoardDragEnd = function (e) {
+    window.__boardDraggedId = null;
+    document.querySelectorAll('.board-card.dragging').forEach(c => c.classList.remove('dragging'));
+    document.querySelectorAll('.board-column.drag-over').forEach(c => c.classList.remove('drag-over'));
+    setTimeout(() => {
+      isDraggingBoardCard = false;
+    }, 80);
+  };
+
+  window.handleBoardCardClick = function (e, id) {
+    if (isDraggingBoardCard) return;
+    window.openPeek(id);
+  };
+
+  window.handleBoardColDragOver = function (e) {
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  };
+
+  window.handleBoardColDragEnter = function (e) {
+    e.preventDefault();
+    const col = e.currentTarget;
+    if (col && col.classList.contains('board-column')) {
+      col.classList.add('drag-over');
+    }
+  };
+
+  window.handleBoardColDragLeave = function (e) {
+    const col = e.currentTarget;
+    if (col && !col.contains(e.relatedTarget)) {
+      col.classList.remove('drag-over');
+    }
+  };
+
+  window.handleBoardColDrop = async function (e, targetCategory) {
+    e.preventDefault();
+    const col = e.currentTarget;
+    if (col) col.classList.remove('drag-over');
+
+    const id = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || window.__boardDraggedId;
+    if (!id || !targetCategory) return;
+    await window.moveResourceToCategory(id, targetCategory);
+  };
+
+  window.moveResourceToCategory = async function (id, targetCategory) {
+    const res = state.resources.find(r => r.id === id);
+    if (!res) return;
+
+    const currentCat = res.category || 'General';
+    if (currentCat.toLowerCase() === targetCategory.toLowerCase()) {
+      return; // Dropped in the same column
+    }
+
+    const previousCategory = res.category;
+    // Optimistic UI update
+    res.category = targetCategory;
+    applyFilters();
+
+    try {
+      const resp = await fetch(`/api/resources/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: targetCategory })
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP error ${resp.status}`);
+      }
+
+      showToast(`Moved "${res.title}" to ${targetCategory}`);
+      await fetchConfig();
+      await fetchResources();
+    } catch (err) {
+      console.error('Failed to move resource:', err);
+      // Revert optimistic update
+      res.category = previousCategory;
+      applyFilters();
+      showToast('Failed to update category');
+    }
+  };
+
+  window.quickAddResourceInBoard = function (cat) {
+    openEditor(null, cat);
+  };
+
+  window.toggleBoardColumnMenu = function (btn, e) {
+    if (e) e.stopPropagation();
+    const actions = btn.closest('.board-col-actions');
+    if (!actions) return;
+    const wasOpen = actions.classList.contains('open');
+    document.querySelectorAll('.board-col-actions.open').forEach(el => el.classList.remove('open'));
+    if (!wasOpen) {
+      actions.classList.add('open');
+    }
+  };
+
+  window.renameBoardCategory = async function (cat) {
+    document.querySelectorAll('.board-col-actions.open').forEach(el => el.classList.remove('open'));
+    if (!state.isAdmin) {
+      promptAdminAccess(() => window.renameBoardCategory(cat));
+      return;
+    }
+
+    const newName = prompt(`Rename category "${cat}" to:`, cat);
+    if (newName && newName.trim() && newName.trim() !== cat) {
+      try {
+        const res = await fetch('/api/categories/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldCategory: cat, newCategory: newName.trim() })
+        });
+        const data = await res.json();
+        showToast(`Renamed "${cat}" to "${newName.trim()}" (${data.updatedCount} files)`);
+        await fetchConfig();
+        await fetchResources();
+      } catch (err) {
+        showToast('Failed to rename category');
+      }
+    }
+  };
+
+  window.deleteBoardCategory = async function (cat) {
+    document.querySelectorAll('.board-col-actions.open').forEach(el => el.classList.remove('open'));
+    if (!state.isAdmin) {
+      promptAdminAccess(() => window.deleteBoardCategory(cat));
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete category "${cat}"?\nAny resources inside it will be moved to "General".`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/categories/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: cat, fallbackCategory: 'General' })
+      });
+      const data = await res.json();
+      showToast(`Deleted category "${cat}" (${data.updatedCount} files moved to General)`);
+      await fetchConfig();
+      await fetchResources();
+    } catch (err) {
+      showToast('Failed to delete category');
+    }
+  };
+
+  // Close open board column menus on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.board-col-actions')) {
+      document.querySelectorAll('.board-col-actions.open').forEach(el => el.classList.remove('open'));
+    }
+  });
+
   function renderBoard() {
     const container = el.boardContainer;
     container.innerHTML = '';
 
-    const categories = state.categories.length > 0 ? state.categories : ['General'];
+    const categorySet = new Set(state.categories);
+    state.resources.forEach(r => {
+      if (r.category) categorySet.add(r.category);
+    });
+    let categories = Array.from(categorySet);
+    if (categories.length === 0) categories = ['General'];
+
+    if (state.activeCategory && state.activeCategory !== 'ALL') {
+      categories = categories.filter(c => c.toLowerCase() === state.activeCategory.toLowerCase());
+      if (categories.length === 0) categories = [state.activeCategory];
+    }
 
     categories.forEach(cat => {
-      const catResources = state.filteredResources.filter(r => (r.category || '').toLowerCase() === cat.toLowerCase());
+      const catResources = state.filteredResources.filter(r => (r.category || 'General').toLowerCase() === cat.toLowerCase());
 
       const col = document.createElement('div');
       col.className = 'board-column';
+      col.setAttribute('data-category', cat);
+
+      col.ondragover = window.handleBoardColDragOver;
+      col.ondragenter = window.handleBoardColDragEnter;
+      col.ondragleave = window.handleBoardColDragLeave;
+      col.ondrop = (e) => window.handleBoardColDrop(e, cat);
 
       let cardsHtml = '';
       if (catResources.length === 0) {
-        cardsHtml = `<div style="color:var(--color-muted); font-size:13px; text-align:center; padding: 20px 0;">No items</div>`;
+        cardsHtml = `
+          <div class="board-empty-col">
+            No documents
+            <div style="font-size:11px; opacity:0.75; margin-top:4px;">Drag cards here or click + New</div>
+          </div>
+        `;
       } else {
         cardsHtml = catResources.map(r => `
-          <div class="board-card ${state.peekActive && state.peekResourceId === r.id ? 'active-peek' : ''}" onclick="window.openPeek('${r.id}')">
+          <div class="board-card ${state.peekActive && state.peekResourceId === r.id ? 'active-peek' : ''}"
+               data-id="${r.id}"
+               draggable="true"
+               ondragstart="window.handleBoardDragStart(event, '${r.id}')"
+               ondragend="window.handleBoardDragEnd(event)"
+               onclick="window.handleBoardCardClick(event, '${r.id}')">
             <!-- Open badge overlay -->
             <button class="card-open-badge" title="Open peek" onclick="window.openPeek('${r.id}'); event.stopPropagation();">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -438,10 +635,10 @@
               </svg>
               <span>Open</span>
             </button>
-            <div style="font-weight:600; font-size:15px; margin-bottom:4px; padding-right:50px;">${escapeHtml(r.title)}</div>
-            <div style="font-size:12px; color:var(--color-muted); margin-bottom:8px;">${r.readingTime} · ${r.tags.length} tags</div>
-            <div style="display:flex; gap:4px; flex-wrap:wrap;">
-              ${r.tags.slice(0, 3).map(t => `<span class="chip" style="font-size:10px; padding:2px 6px;">#${t}</span>`).join('')}
+            <div class="board-card-title">${escapeHtml(r.title)}</div>
+            <div class="board-card-meta">${escapeHtml(r.readingTime || '1 min read')} · ${(r.tags || []).length} tags</div>
+            <div class="board-card-tags flex-wrap gap-1.5">
+              ${(r.tags || []).map(t => `<span class="chip" title="#${escapeHtml(t)}" onclick="window.filterByTag('${escapeHtml(t)}'); event.stopPropagation();">#${escapeHtml(t)}</span>`).join('')}
             </div>
           </div>
         `).join('');
@@ -449,8 +646,42 @@
 
       col.innerHTML = `
         <div class="board-col-header">
-          <span>${cat}</span>
-          <span class="chip-count">${catResources.length}</span>
+          <div class="board-col-title-group" title="${escapeHtml(cat)}">
+            <span class="board-col-title">${escapeHtml(cat)}</span>
+            <span class="chip-count">${catResources.length}</span>
+          </div>
+          <div class="board-col-actions" data-category="${escapeHtml(cat)}">
+            <button class="board-add-btn" title="Create document in ${escapeHtml(cat)}" onclick="window.quickAddResourceInBoard('${escapeHtml(cat)}'); event.stopPropagation();">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>New</span>
+            </button>
+            <button class="board-col-menu-btn" title="Category options" onclick="window.toggleBoardColumnMenu(this, event)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1.5"></circle>
+                <circle cx="19" cy="12" r="1.5"></circle>
+                <circle cx="5" cy="12" r="1.5"></circle>
+              </svg>
+            </button>
+            <div class="board-col-dropdown">
+              <button class="dropdown-item" onclick="window.renameBoardCategory('${escapeHtml(cat)}'); event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                <span>Rename</span>
+              </button>
+              <button class="dropdown-item" style="color:var(--color-error);" onclick="window.deleteBoardCategory('${escapeHtml(cat)}'); event.stopPropagation();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="board-col-cards">
           ${cardsHtml}
@@ -1375,15 +1606,19 @@
     };
   }
 
-  function openEditor(id = null) {
+  function openEditor(id = null, defaultCategory = null) {
     if (!state.isAdmin) {
-      promptAdminAccess(() => openEditor(id));
+      promptAdminAccess(() => openEditor(id, defaultCategory));
       return;
     }
 
     // Populate category dropdown
     el.editorCategory.innerHTML = '<option value="">-- Select Category --</option>';
-    state.categories.forEach(cat => {
+    const catSet = new Set(state.categories);
+    if (defaultCategory && defaultCategory !== '__NEW__') {
+      catSet.add(defaultCategory);
+    }
+    catSet.forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;
@@ -1404,10 +1639,10 @@
       el.editorBody.value = res.body || '';
       currentEditorTags = [...(res.tags || [])];
     } else {
-      el.editorModalTitle.textContent = 'Create New Resource';
+      el.editorModalTitle.textContent = defaultCategory ? `Create Resource in ${defaultCategory}` : 'Create New Resource';
       el.editorId.value = '';
       el.editorTitle.value = '';
-      el.editorCategory.value = state.categories[0] || 'General';
+      el.editorCategory.value = defaultCategory || state.categories[0] || 'General';
       el.editorNewCategory.style.display = 'none';
       el.editorNewCategory.value = '';
       el.editorDescription.value = '';

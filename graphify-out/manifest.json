@@ -1,0 +1,104 @@
+{
+  "components/NotionPeekGrid.jsx": {
+    "mtime": 1792610999.314777,
+    "seen": 1792646737.0346582,
+    "ast_hash": "e03e0271c25e3ca801867c7a6baffb49",
+    "semantic_hash": "e03e0271c25e3ca801867c7a6baffb49"
+  },
+  "package.json": {
+    "mtime": 1792600486.5138984,
+    "seen": 1792646737.0346582,
+    "ast_hash": "00e5531a2c9d20f4fdc2f045506380da",
+    "semantic_hash": "00e5531a2c9d20f4fdc2f045506380da"
+  },
+  "public/app.js": {
+    "mtime": 1792635849.8275836,
+    "seen": 1792646737.0346582,
+    "ast_hash": "8673096c183bffaecf75e72e258253d6",
+    "semantic_hash": "8673096c183bffaecf75e72e258253d6"
+  },
+  "public/vendor/marked.min.js": {
+    "mtime": 1792635586.5257661,
+    "seen": 1792646737.0346582,
+    "ast_hash": "4b2ea86842e27255c2c32fec880bc1d6",
+    "semantic_hash": "4b2ea86842e27255c2c32fec880bc1d6"
+  },
+  "server.js": {
+    "mtime": 1792636132.8309398,
+    "seen": 1792646737.0346582,
+    "ast_hash": "b032f98ff16b7dd0c313d0db668fd017",
+    "semantic_hash": "b032f98ff16b7dd0c313d0db668fd017"
+  },
+  ".agents/rules/coding-standards.md": {
+    "mtime": 1792635107.1746488,
+    "seen": 1792646737.0346582,
+    "ast_hash": "67ced0be0b0f9dd8d884b029d682bb7f",
+    "semantic_hash": "67ced0be0b0f9dd8d884b029d682bb7f"
+  },
+  "AGENTS.md": {
+    "mtime": 1792635896.7948031,
+    "seen": 1792646737.0346582,
+    "ast_hash": "84f9f21cf52cd36407a1e63f98eb7bdb",
+    "semantic_hash": "84f9f21cf52cd36407a1e63f98eb7bdb"
+  },
+  "README.md": {
+    "mtime": 1792635883.517517,
+    "seen": 1792646737.0346582,
+    "ast_hash": "e8858ebd5f6efd5528ead8daf838c0f5",
+    "semantic_hash": "e8858ebd5f6efd5528ead8daf838c0f5"
+  },
+  "localmd/frontend-architecture.md": {
+    "mtime": 1792635574.6855175,
+    "seen": 1792646737.0346582,
+    "ast_hash": "a3230de0496de3015e515ba3dda4cd50",
+    "semantic_hash": "a3230de0496de3015e515ba3dda4cd50"
+  },
+  "localmd/getting-started.md": {
+    "mtime": 1792635564.347017,
+    "seen": 1792646737.0346582,
+    "ast_hash": "35bdf673e818a61535c2b541b3a300a4",
+    "semantic_hash": "35bdf673e818a61535c2b541b3a300a4"
+  },
+  "localmd/git-cheatsheet-and-workflows.md": {
+    "mtime": 1792600527.4798493,
+    "seen": 1792646737.0346582,
+    "ast_hash": "6530514d4a681b5eaecad61a241d42a2",
+    "semantic_hash": "6530514d4a681b5eaecad61a241d42a2"
+  },
+  "localmd/notion-design-system.md": {
+    "mtime": 1792600505.5486019,
+    "seen": 1792646737.0346582,
+    "ast_hash": "e87ce1a090b8b763d0931af42bb3ca78",
+    "semantic_hash": "e87ce1a090b8b763d0931af42bb3ca78"
+  },
+  "localmd/rest-api-best-practices.md": {
+    "mtime": 1792600518.7739713,
+    "seen": 1792646737.0346582,
+    "ast_hash": "c4a4309311bde5ce24f419aa5f72cd36",
+    "semantic_hash": "c4a4309311bde5ce24f419aa5f72cd36"
+  },
+  "localmd/use-graphify.md": {
+    "mtime": 1792613465.9809713,
+    "seen": 1792646737.0346582,
+    "ast_hash": "5936edf8c3341bd6e2065bea338a3d4f",
+    "semantic_hash": "5936edf8c3341bd6e2065bea338a3d4f"
+  },
+  "notion.site-design.md": {
+    "mtime": 1792599747.1540482,
+    "seen": 1792646737.0346582,
+    "ast_hash": "3f0a633527941c67bef85beb3abe1406",
+    "semantic_hash": "3f0a633527941c67bef85beb3abe1406"
+  },
+  "piszczek.pl-design.md": {
+    "mtime": 1792606821.838423,
+    "seen": 1792646737.0346582,
+    "ast_hash": "f3c74a0701412b687f212bc82035640a",
+    "semantic_hash": "f3c74a0701412b687f212bc82035640a"
+  },
+  "public/index.html": {
+    "mtime": 1792635610.5605032,
+    "seen": 1792646737.0346582,
+    "ast_hash": "d9873acd0be444ddd6c23dd74afb8503",
+    "semantic_hash": "d9873acd0be444ddd6c23dd74afb8503"
+  }
+}
