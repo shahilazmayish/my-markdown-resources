@@ -1,0 +1,17 @@
+{
+  "name": "notion-resource-hub",
+  "version": "1.0.0",
+  "description": "Offline Notion-style Resource Hub reading from localmd directory",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "notion",
+    "resources",
+    "markdown",
+    "offline"
+  ],
+  "author": "",
+  "license": "MIT"
+}
