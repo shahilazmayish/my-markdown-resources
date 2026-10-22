@@ -1,0 +1,5 @@
+# Ignore everything inside the localmd folder
+localmd/*
+
+# Except for the hidden .gitkeep file (keeps the folder alive on GitHub)
+!localmd/.gitkeep
